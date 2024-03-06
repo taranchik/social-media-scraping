@@ -33,45 +33,17 @@ class TwitterScraper():
     # Initialize the driver (assuming Chrome)
     self._driver = webdriver.Chrome()
 
-  def get_articles_length(self):
+  def get_containers_length(self):
     try:
-        articles = WebDriverWait(self._driver, self.load_timeout).until(
+        # Get all containers on the page
+        containers = WebDriverWait(self._driver, self.load_timeout).until(
             EC.presence_of_all_elements_located((By.XPATH, f"//div[@data-testid='cellInnerDiv']"))
         )
     except TimeoutException:
         return 0
     
-    return len(articles)
+    return len(containers)
   
-  def has_tweet(self, index):
-     try:
-        # Skip if tweet is Ad (Ad tweet does not have time posted)
-        WebDriverWait(self._driver, self.load_timeout).until(
-            EC.presence_of_element_located((By.XPATH, f"//div[@data-testid='cellInnerDiv'][{index}]//article[@data-testid='tweet']//a[contains(@href, '/status/')]/time"))
-        )
-
-        # Wait for tweet loading or Skip if Container does not have Tweet inside
-        WebDriverWait(self._driver, self.load_timeout).until(
-            EC.presence_of_element_located((By.XPATH, f"//div[@data-testid='cellInnerDiv'][{index}]//article[@data-testid='tweet']"))
-        )
-     except TimeoutException:
-        return False
-     
-     return True
-  
-  def find_tweet_index(self, previous_tweet_index, previous_tweet_id):
-      for index in range(previous_tweet_index, 0, -1):
-        tweet_id, _ = self.retreive_tweet(index)
-
-        print(tweet_id, previous_tweet_id)
-        print(index)
-        print(type(tweet_id), type(previous_tweet_id))
-
-        if tweet_id == previous_tweet_id:
-           return index + 1
-        
-      raise Exception('Sufficient tweet_id not found')
-
   def signIn(self, username, password):
     # Open Twitter
     self._driver.get("https://twitter.com/login")
@@ -108,11 +80,29 @@ class TwitterScraper():
       )
     except TimeoutException:
       raise Exception("Timed out waiting for log in.")
+  
+  def load_tweets(self, index):
+    try:
+      # Get tweet's container
+      container = WebDriverWait(self._driver, self.load_timeout).until(
+          EC.presence_of_element_located((By.XPATH, f"//div[@data-testid='cellInnerDiv'][{index}]"))
+      )
+      
+      # Scroll into tweet's container view
+      self._driver.execute_script("arguments[0].scrollIntoView();", container)
 
+      # Make sure the page has been fully loaded
+      WebDriverWait(self._driver, self.load_timeout).until(
+          EC.invisibility_of_element_located((By.XPATH, f"//div[@aria-label='Loading timeline']"))
+      )
+     
+    except TimeoutException:
+      raise Exception("Timed out waiting for loading tweets.")
+ 
   def retreive_user_id(self, username):
     try:
       follow_button = WebDriverWait(self._driver, self.load_timeout).until(
-          EC.presence_of_element_located((By.XPATH, f'//div[@aria-label="Follow @{username}"]'))
+          EC.presence_of_element_located((By.XPATH, f'//div[@aria-label="Follow @{username}" or @aria-label="Subscribe to @{username}"]'))
       )
       author_id = follow_button.get_attribute('data-testid').split('-')[0]
     except TimeoutException:
@@ -120,45 +110,41 @@ class TwitterScraper():
 
     return author_id
   
-  def load_tweets(self, index):
-    try:
-      container = WebDriverWait(self._driver, self.load_timeout).until(
-          EC.presence_of_element_located((By.XPATH, f"//div[@data-testid='cellInnerDiv'][{index}]"))
-      )
-      
-      # Scroll the article into view
-      self._driver.execute_script("arguments[0].scrollIntoView();", container)
+  def is_tweet(self, index):
+     try:
+        # Skip if tweet is Ad (Ad tweet does not have time posted)
+        WebDriverWait(self._driver, self.load_timeout).until(
+            EC.presence_of_element_located((By.XPATH, f"//div[@data-testid='cellInnerDiv'][{index}]//article[@data-testid='tweet']//a[contains(@href, '/status/')]/time"))
+        )
 
-      # Make sure the page has been loaded
-      WebDriverWait(self._driver, self.load_timeout).until(
-          EC.invisibility_of_element_located((By.XPATH, f"//div[@aria-label='Loading timeline']"))
-      )
+        # Wait for tweet loading or Skip if Container does not have Tweet inside
+        WebDriverWait(self._driver, self.load_timeout).until(
+            EC.presence_of_element_located((By.XPATH, f"//div[@data-testid='cellInnerDiv'][{index}]//article[@data-testid='tweet']"))
+        )
+     except TimeoutException:
+        return False
      
-    except TimeoutException:
-      raise Exception("Timed out waiting for tweet container with specified index to load.")
+     return True
   
   def retreive_tweet(self, index):
     tweet_id = 0
     tweet = {}
-    has_tweet = self.has_tweet(index)
+    is_tweet = self.is_tweet(index)
 
-    if not has_tweet:
+    # If inside container no tweet - return default values
+    if not is_tweet:
        return tweet_id, tweet
 
-    container_path = f"//div[@data-testid='cellInnerDiv'][{index}]//article[@data-testid='tweet']"
-
     try:
+      print("INSIDE")
       container = WebDriverWait(self._driver, self.load_timeout).until(
-          EC.element_to_be_clickable((By.XPATH, f"{container_path}"))
+          EC.presence_of_element_located((By.XPATH, f"//div[@data-testid='cellInnerDiv'][{index}]"))
       )
       print(container.get_attribute('outerHTML'))
       
       tweet_id = WebDriverWait(container, self.load_timeout).until(
           EC.presence_of_element_located((By.XPATH, ".//a[contains(@href, '/status/')]"))).get_attribute("href").split('/')[-1]
       print(tweet_id)
-      author = WebDriverWait(container, self.load_timeout).until(
-          EC.presence_of_element_located((By.XPATH, ".//div[@data-testid='User-Name']/div/div/a"))).get_attribute("href").split('/')[-1]
-      print(author)
       date = WebDriverWait(container, self.load_timeout).until(
           EC.presence_of_element_located((By.XPATH, ".//a[contains(@href, '/status/')]/time"))).get_attribute("datetime")
       print(date)
@@ -177,25 +163,30 @@ class TwitterScraper():
       views = WebDriverWait(container, self.load_timeout).until(
           EC.presence_of_element_located((By.XPATH, ".//div[@data-testid='reply']/parent::div/parent::div/div[4]"))).text
       print("VIEWS: ", views)
+      author = WebDriverWait(container, self.load_timeout).until(
+          EC.presence_of_element_located((By.XPATH, ".//div[@data-testid='User-Name']/div/div/a"))).get_attribute("href").split('/')[-1]
+      print(author)
     except TimeoutException:
       raise Exception("Timed out waiting for tweet to load.")
     
     try:
-        # Click on the article
-        self._driver.execute_script("arguments[0].click();", container)
+        # Click on the tweet
+        self._driver.execute_script("arguments[0].click();", WebDriverWait(container, self.load_timeout).until(
+          EC.presence_of_element_located((By.XPATH, ".//div[@data-testid='tweetText']"))))
 
-        # Make sure the page has been loaded
+        # Make sure the page has been fully loaded
         WebDriverWait(self._driver, self.load_timeout).until(
             EC.invisibility_of_element_located((By.XPATH, f"//div[@aria-label='Loading timeline']"))
         )
 
         # Get author_id
         author_id = self.retreive_user_id(author)
+        
         print(author_id)
         # Back on the article list
         self._driver.back()
 
-        # Make sure the page has been loaded
+        # Make sure the page has been fully loaded
         WebDriverWait(self._driver, self.load_timeout).until(
             EC.invisibility_of_element_located((By.XPATH, f"//div[@aria-label='Loading timeline']"))
         )
@@ -205,36 +196,48 @@ class TwitterScraper():
     return tweet_id, {"author_id": author_id, "author": author, "date": date, "text": text, "replies": replies, "replies": replies, "reposts": reposts, "likes": likes, "views": views}
   
   def retreive_tweets(self, number_of_tweets):
-    tweets_length = self.get_articles_length()
-    tweet_index = 0
+    tweets_length = self.get_containers_length()
+    tweet_index = tweets_length + 1
     tweet_ids = []
     last_author_id = ''
     last_author = ''
     
     while number_of_tweets != len(tweet_ids):
-        tweet_index += 1
-        print(tweet_index)
+        # Decrease tweet_index per each iteration
+        tweet_index -= 1
+        print("MAIN INDEX: ", tweet_index)
+        
+        # Do not iterate if tweets_length is empty
+        if not tweets_length:
+           break
+        
+        # Fetch tweet data if tweet_index > 0
+        if tweet_index:
+            tweet_id, tweet = self.retreive_tweet(tweet_index)
 
-        if tweet_index > tweets_length:
-            if not tweets_length:
-              break
-            else:
-              # Scroll to the tweet_index
-              self.load_tweets(tweet_index - 1)
-              tweets_length = self.get_articles_length()
-              tweet_index = self.find_tweet_index(tweets_length, tweet_ids[-1])
+            # If no tweet data inside container - continue
+            if not tweet_id:
+               continue
 
-        tweet_id, tweet = self.retreive_tweet(tweet_index)
+        print(tweet_ids, tweet_id)
 
-        if not tweet_id:
-           continue
+        # If tweet_index(first list iteration) equals zero - is necessary to update list
+        # If last tweet_id equals current tweet_id - is necessary to update list
+        if not tweet_index or (tweet_ids and tweet_ids[-1] == tweet_id):
+          # Scroll to the tweet_index
+          self.load_tweets(tweets_length)
+          tweets_length = self.get_containers_length()
+          tweet_index = tweets_length + 1
+          continue
 
         print(tweet)
         self.tweets_collection.update_one({"tweet_id": tweet_id},{ "$set": { "updated_at": datetime.utcnow(), **tweet}}, upsert=True)
         tweet_ids.append(tweet_id)
 
-        last_author_id = tweet["author_id"]
-        last_author = tweet["author"]
+        # Save last tweet's author name and id
+        if number_of_tweets == len(tweet_ids):
+            last_author_id = tweet["author_id"]
+            last_author = tweet["author"]
 
     return tweet_ids, last_author_id, last_author
   
@@ -252,7 +255,3 @@ class TwitterScraper():
     tweet_ids, _, _ = self.retreive_tweets(20)
    
     self.hashtag_collection.update_one({"hashtag": hashtag}, {"$set": {"updated_at": datetime.utcnow(), "tweet_ids": tweet_ids}}, upsert=True)
-
-  def close_scraper(self):
-    # Close the driver
-    self._driver.quit()
