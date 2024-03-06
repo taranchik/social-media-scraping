@@ -1,0 +1,3 @@
+# Rename to .env and fill empty field
+TWITTER_USERNAME=
+TWITTER_PASSWORD=
