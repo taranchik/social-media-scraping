@@ -1,54 +1,129 @@
-from dotenv import dotenv_values
-
-# Load environment variables from .env file
-env = dotenv_values('.env')
-
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
-import time
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
+from selenium.webdriver.support import expected_conditions as EC
+from datetime import datetime
 
 
-class TwitterScraper():
-  def __init__(self):
-    # Initialize the driver (assuming Chrome)
+class RedditScraper():
+  def __init__(self, posts_collection, subreddit_posts_collection):
+    self.load_timeout = 10
+
+    self.posts_collection = posts_collection
+    self.subreddit_posts_collection = subreddit_posts_collection
+
+    self._driver = None
+
+  def open(self):
     self._driver = webdriver.Chrome()
+    self._driver.maximize_window()
 
-  def signIn(self, username, password):
-    # Open Twitter
-    self._driver.get("https://twitter.com/login")
+  def close(self):
+     self._driver.close()
 
-    # Wait for the page to load
-    time.sleep(5)
+  def get_posts(self, initial_posts_length):
+    attempts_to_load = 0
 
-    # Log in (Replace 'your_username' and 'your_password' with your Twitter credentials)
-    username_field = self._driver.find_element(By.NAME, "session[username_or_email]")
-    password_field = self._driver.find_element(By.NAME, "session[password]")
+    while True:
+        try:
+            # Wait for the number of posts to increase
+            WebDriverWait(self._driver, self.load_timeout).until(
+                lambda d: len(d.find_elements(By.XPATH, "//article")) > initial_posts_length
+            )
 
-    username_field.send_keys(username)
-    password_field.send_keys(password)
-    password_field.send_keys(Keys.RETURN)
+            # Get all articles on the page
+            articles = WebDriverWait(self._driver, self.load_timeout).until(
+                EC.presence_of_all_elements_located((By.XPATH, f"//article"))
+            )
+            
+            return articles
+        except TimeoutException:
+            if attempts_to_load > 3:
+              return []
+            else:
+              attempts_to_load += 1
+    
+  
+  def load_posts(self, article):
+    attempts_to_load = 0
+    initial_scroll_position = self._driver.execute_script("return window.pageYOffset;")
 
-    # Wait for login to complete
-    time.sleep(5)
+    while True:
+        try:
+          # Scroll into post's article view
+          self._driver.execute_script("arguments[0].scrollIntoView();", article)
 
-  def retreive_lastest_profile_tweets(self, username):
-    # Navigate to a profile page or search for a hashtag
-    # For a profile:
-    self._driver.get(f"https://twitter.com/{username}")
+          # Make sure the page has been fully loaded
+          WebDriverWait(self._driver, self.load_timeout).until(
+              EC.invisibility_of_element_located((By.XPATH, f"//faceplate-partial[@loading='programmatic' and @hasbeenloaded='true']"))
+          )
 
-    # Scroll to load tweets or find specific elements as needed
-    # This is a simplistic way to scroll a bit; you may need more sophisticated scrolling logic
-    self._driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+          new_scroll_position = self._driver.execute_script("return window.pageYOffset;")
 
-    # Add your logic here to parse tweets
-    # This will depend on the structure of the page and can be quite complex
+          if new_scroll_position > initial_scroll_position or attempts_to_load > 3:
+             break
+          else:
+             attempts_to_load += 1
 
-  def retreive_20_popular_tweets(self, hashtag):
-    # For a hashtag search:
-    self._driver.get(f"https://twitter.com/search?q=%23{hashtag}&src=typed_query")
+        except TimeoutException:
+            if attempts_to_load > 3:
+                raise Exception("Time out for waiting posts to load.")
+            else:
+                attempts_to_load += 1
+    
+  def is_pinned_post(self, article):
+    try:
+        article.find_element(By.CSS_SELECTOR, f"shreddit-status-icons svg.hidden.stickied-status")
 
-  def close_scraper(self):
-    # Close the driver
-    self._driver.quit()
+        return False
+    except NoSuchElementException:
+        return True
 
+ 
+  def retreive_post(self, article):
+      attempts_to_load = 0
+
+      while True:
+          try:
+              post_id = article.find_element(By.XPATH, "./shreddit-post").get_attribute("id").split('_')[-1]
+              title = article.get_attribute("aria-label")
+              content = article.find_element(By.XPATH, ".//a[@slot='text-body']").text
+              number_of_comments = article.find_element(By.XPATH, "./shreddit-post").get_attribute("comment-count")
+              rating = article.find_element(By.XPATH, "./shreddit-post").get_attribute("score")
+              
+              return post_id, {"post_id": post_id, "title": title, "content": content, "number_of_comments": number_of_comments, "rating": rating}
+          except StaleElementReferenceException:
+              if attempts_to_load > 3:
+                raise Exception("Time out for post data retreival.")
+              else:
+                attempts_to_load += 1
+
+  def retreive_posts(self, number_of_posts):
+    posts = self.get_posts(0)
+    post_index = 0
+    post_ids = []
+    
+    while posts and number_of_posts != len(post_ids):
+        is_pinned = self.is_pinned_post(posts[post_index])
+        
+        if not is_pinned:
+            post_id, post = self.retreive_post(posts[post_index])
+            
+            self.posts_collection.update_one({"post_id": post_id},{ "$set": { "updated_at": datetime.utcnow(), **post}}, upsert=True)
+            post_ids.append(post_id)
+        
+        post_index += 1
+
+        if len(posts) == post_index:
+          self.load_posts(posts[post_index - 1])
+          posts = self.get_posts(len(posts))
+
+    return post_ids
+  
+  def retreive_subreddit_posts(self, subreddit):
+    self._driver.get(f"https://www.reddit.com/r/{subreddit}/")
+    
+    post_ids = self.retreive_posts(100)
+   
+    self.subreddit_posts_collection.update_one({"subreddit": subreddit}, {"$set": {"updated_at": datetime.utcnow(), "post_ids": post_ids}}, upsert=True)
