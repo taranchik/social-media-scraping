@@ -1,0 +1,22 @@
+# Use the official Python image as base
+FROM python:3.9-slim
+
+# Set working directory in the container
+WORKDIR /app
+
+COPY . .
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install necessary dependencies
+RUN apt-get update && \
+  apt-get install -y wget && \
+  apt-get clean
+
+# Download and install ChromeDriver
+RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+  apt-get install -y ./google-chrome-stable_current_amd64.deb && \
+  rm google-chrome-stable_current_amd64.deb
+
+# Command to run the scraping script
+CMD ["python", "scraping-script.py"]

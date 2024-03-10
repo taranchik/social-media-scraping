@@ -1,0 +1,5 @@
+# Use the official MongoDB image as base
+FROM mongo:5.0
+
+# Expose MongoDB port
+EXPOSE 27017

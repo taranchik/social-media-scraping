@@ -4,24 +4,18 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
 from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
+from Crawler.browser import Browser
 
 
-class TwitterScraper():
+class TwitterScraper(Browser):
   def __init__(self, tweets_collection, profile_collection, hashtag_collection):
+    super().__init__()
+    
     self.load_timeout = 10
 
     self.tweets_collection = tweets_collection
     self.profile_collection = profile_collection
     self.hashtag_collection = hashtag_collection
-
-    self._driver = None
-
-  def open(self):
-    self._driver = webdriver.Chrome()
-    self._driver.maximize_window()
-
-  def close(self):
-     self._driver.close()
 
   def get_tweets(self):
     attempts_to_load = 0
@@ -46,7 +40,7 @@ class TwitterScraper():
 
     while True:
         try:
-          # Scroll into post's article view
+          # Scroll into tweet view
           self._driver.execute_script("arguments[0].scrollIntoView();", tweet)
 
           # Make sure the page has been fully loaded
@@ -135,7 +129,6 @@ class TwitterScraper():
           try:
               tweet_id = tweet.find_element(By.XPATH, ".//a[contains(@href, '/status/')]").get_attribute("href").split('/')[-1]
               author = tweet.find_element(By.XPATH, ".//div[@data-testid='User-Name']/div/div/a").get_attribute("href").split('/')[-1]
-              print(tweet_id, author)
               date = tweet.find_element(By.XPATH, ".//a[contains(@href, '/status/')]/time").get_attribute("datetime")
               text = self.handle_statistics(tweet, ".//div[@data-testid='tweetText']")
               replies = self.handle_statistics(tweet, ".//div[@data-testid='reply']")
@@ -160,7 +153,6 @@ class TwitterScraper():
     while tweets and number_of_tweets != len(tweets_data):
         tweet_index -= 1
         is_tweet = self.is_tweet(tweets[tweet_index])
-        print(tweet_index)
 
         if is_tweet:
             tweet_id, tweet = self.retreive_tweet(tweets[tweet_index])
@@ -175,7 +167,6 @@ class TwitterScraper():
                 tweet_ids.append(tweet_id)
                 last_author = tweet["author"]
         
-    print(tweet_ids)
     return tweet_ids, last_author
   
   def retreive_lastest_profile_tweets(self, username):

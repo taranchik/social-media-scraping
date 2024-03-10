@@ -1,4 +1,0 @@
-# Rename to .env and fill empty field
-TWITTER_USERNAME=
-TWITTER_PASSWORD=
-MONGO_DB_HOST=

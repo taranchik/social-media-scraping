@@ -4,23 +4,17 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
 from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
+from Crawler.browser import Browser
 
 
-class RedditScraper():
+class RedditScraper(Browser):
   def __init__(self, posts_collection, subreddit_posts_collection):
+    super().__init__()
+    
     self.load_timeout = 10
 
     self.posts_collection = posts_collection
     self.subreddit_posts_collection = subreddit_posts_collection
-
-    self._driver = None
-
-  def open(self):
-    self._driver = webdriver.Chrome()
-    self._driver.maximize_window()
-
-  def close(self):
-     self._driver.close()
 
   def get_posts(self, initial_posts_length):
     attempts_to_load = 0
@@ -83,7 +77,7 @@ class RedditScraper():
  
   def retreive_post(self, article):
       attempts_to_load = 0
-
+      
       while True:
           try:
               post_id = article.find_element(By.XPATH, "./shreddit-post").get_attribute("id").split('_')[-1]
@@ -99,7 +93,45 @@ class RedditScraper():
               else:
                 attempts_to_load += 1
 
-  def retreive_posts(self, number_of_posts):
+  def convert_to_number(self, str_number):
+      suffixes = {
+          'K': 1000,
+          'M': 1000000,
+          'B': 1000000000,
+      }
+
+      # If the value is None or str_number does not contain suffix
+      if not str_number or not str_number[-1] in suffixes:
+         return 0
+      
+      multiplier = 1
+
+      if str_number[-1] in suffixes:
+          multiplier = suffixes[str_number[-1]]
+          str_number = str_number[:-1]  # Remove the suffix character
+      
+      try:
+          return float(str_number) * multiplier
+      except ValueError:
+          # Handle the case where the input string is not a valid number
+          return 0
+
+  def match_the_filter(self, filter, value):
+      valid_number = self.convert_to_number(value)
+
+      if filter:
+          if "min" in filter and "max" in filter:
+              return filter["min"] <= valid_number <= filter["max"]
+          elif "min" in filter:
+                  return valid_number >= filter["min"]
+          elif "max" in filter:
+              return valid_number <= filter["max"]
+      else:
+         return True
+              
+      return False
+
+  def retreive_posts(self, number_of_posts, filters={}):
     posts = self.get_posts(0)
     post_index = 0
     post_ids = []
@@ -110,8 +142,12 @@ class RedditScraper():
         if not is_pinned:
             post_id, post = self.retreive_post(posts[post_index])
             
-            self.posts_collection.update_one({"post_id": post_id},{ "$set": { "updated_at": datetime.utcnow(), **post}}, upsert=True)
-            post_ids.append(post_id)
+            comments_filter_match = self.match_the_filter(filters.get("number_of_comments", {}), post["number_of_comments"])
+            rating_filter_match = self.match_the_filter(filters.get("rating", {}), post["rating"])
+
+            if comments_filter_match and rating_filter_match:
+                self.posts_collection.update_one({"post_id": post_id},{ "$set": { "updated_at": datetime.utcnow(), **post}}, upsert=True)
+                post_ids.append(post_id)
         
         post_index += 1
 
@@ -121,9 +157,9 @@ class RedditScraper():
 
     return post_ids
   
-  def retreive_subreddit_posts(self, subreddit):
+  def retreive_subreddit_posts(self, subreddit, filters={}):
     self._driver.get(f"https://www.reddit.com/r/{subreddit}/")
     
-    post_ids = self.retreive_posts(100)
+    post_ids = self.retreive_posts(100, filters)
    
     self.subreddit_posts_collection.update_one({"subreddit": subreddit}, {"$set": {"updated_at": datetime.utcnow(), "post_ids": post_ids}}, upsert=True)
