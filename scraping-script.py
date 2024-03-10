@@ -40,7 +40,8 @@ def run_twitter_scraper():
 def run_reddit_scraper():
     print("REDDIT")
     reddit.open()
-    reddit.retreive_subreddit_posts('investing', {"number_of_comments": {"min": 100}})
+    # Example of Reddit filters (avaliable by rating and number_of_comments)
+    # reddit.retreive_subreddit_posts('investing', {"number_of_comments": {"min": 100}})
     reddit.retreive_subreddit_posts('investing')
     reddit.retreive_subreddit_posts('layer_two')
     reddit.close()
