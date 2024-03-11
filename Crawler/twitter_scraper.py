@@ -182,3 +182,10 @@ class TwitterScraper(Browser):
     tweet_ids, _ = self.retreive_tweets(20)
    
     self.hashtag_collection.update_one({"hashtag": hashtag}, {"$set": {"updated_at": datetime.utcnow(), "tweet_ids": tweet_ids}}, upsert=True)
+
+  def run_scraper(self, username, password):
+    self.open()
+    self.signIn(username, password)
+    self.retreive_lastest_profile_tweets('donaldtusk')
+    self.retreive_popular_tweets('holiday')
+    self.close()

@@ -163,3 +163,11 @@ class RedditScraper(Browser):
     post_ids = self.retreive_posts(100, filters)
    
     self.subreddit_posts_collection.update_one({"subreddit": subreddit}, {"$set": {"updated_at": datetime.utcnow(), "post_ids": post_ids}}, upsert=True)
+
+  def run_scraper(self):
+    self.open()
+    # Example of Reddit filters (avaliable by rating and number_of_comments)
+    # reddit.retreive_subreddit_posts('investing', {"number_of_comments": {"min": 100}})
+    self.retreive_subreddit_posts('investing')
+    self.retreive_subreddit_posts('layer_two')
+    self.close()

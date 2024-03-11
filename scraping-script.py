@@ -30,28 +30,20 @@ reddit_posts_collection.create_index([("post_id", 1)], unique=True)
 twitter = TwitterScraper(twitter_tweets_collection, twitter_profile_collection, twitter_hashtag_collection)
 reddit = RedditScraper(reddit_posts_collection, reddit_subreddit_posts_collection)
 
-def run_twitter_scraper():
-    twitter.open()
-    twitter.signIn(env['TWITTER_USERNAME'], env['TWITTER_PASSWORD'])
-    twitter.retreive_lastest_profile_tweets('donaldtusk')
-    twitter.retreive_popular_tweets('holiday')
-    twitter.close()
+def run_tasks():
+    try:
+        reddit.run_scraper()
+    except Exception as e:
+        print(f"While Reddit scrapping an error occurred: {str(e)}.")
 
-def run_reddit_scraper():
-    reddit.open()
-    # Example of Reddit filters (avaliable by rating and number_of_comments)
-    # reddit.retreive_subreddit_posts('investing', {"number_of_comments": {"min": 100}})
-    reddit.retreive_subreddit_posts('investing')
-    reddit.retreive_subreddit_posts('layer_two')
-    reddit.close()
+    try:
+        twitter.run_scraper(env['TWITTER_USERNAME'], env['TWITTER_PASSWORD'])
+    except Exception as e:
+        print(f"While Twitter scrapping an error occurred: {str(e)}.")
 
-def schedule_tasks():
-    schedule.every().hour.do(run_reddit_scraper)
-    schedule.every().hour.do(run_twitter_scraper)
+if __name__ == "__main__":
+    schedule.every().hour.do(run_tasks)
 
     while True:
         schedule.run_pending()
         time.sleep(1)
-
-if __name__ == "__main__":
-    schedule_tasks()
