@@ -100,8 +100,14 @@ class RedditScraper(Browser):
       }
 
       # If the value is None or str_number does not contain suffix
-      if not str_number or not str_number[-1] in suffixes:
+      if not str_number:
          return 0
+      elif not str_number[-1] in suffixes:
+          try:
+              return float(str_number)
+          except ValueError:
+              # Handle the case where the input string is not a valid number
+              return 0
       
       multiplier = 1
 
@@ -109,11 +115,7 @@ class RedditScraper(Browser):
           multiplier = suffixes[str_number[-1]]
           str_number = str_number[:-1]  # Remove the suffix character
       
-      try:
-          return float(str_number) * multiplier
-      except ValueError:
-          # Handle the case where the input string is not a valid number
-          return 0
+      return float(str_number) * multiplier
 
   def match_the_filter(self, filter, value):
       valid_number = self.convert_to_number(value)
@@ -141,10 +143,13 @@ class RedditScraper(Browser):
         if not is_pinned:
             post_id, post = self.retreive_post(posts[post_index])
             
-            comments_filter_match = self.match_the_filter(filters.get("number_of_comments", {}), post["number_of_comments"])
-            rating_filter_match = self.match_the_filter(filters.get("rating", {}), post["rating"])
+            # Whether post matches the filters
+            filters_matched = True
 
-            if comments_filter_match and rating_filter_match:
+            for key in filters.keys():
+                filters_matched = self.match_the_filter(filters[key], post[key])
+
+            if filters_matched:
                 self.posts_collection.update_one({"post_id": post_id},{ "$set": { "updated_at": datetime.utcnow(), **post}}, upsert=True)
                 post_ids.append(post_id)
         
@@ -166,7 +171,7 @@ class RedditScraper(Browser):
   def run_scraper(self):
     self.open()
     # Example of Reddit filters (avaliable by rating and number_of_comments)
-    # reddit.retreive_subreddit_posts('investing', {"number_of_comments": {"min": 100}})
+    # self.retreive_subreddit_posts('investing', {"number_of_comments": {"min": 20}})
     self.retreive_subreddit_posts('investing')
     self.retreive_subreddit_posts('blockchain')
     self.close()

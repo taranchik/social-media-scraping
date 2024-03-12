@@ -69,7 +69,7 @@ docker-compose up -d
 
 ---
 
-## Author Info
+## Author
 
 - LinkedIn - [Viacheslav Taranushenko](https://www.linkedin.com/in/viacheslav-taranushenko-727466187/)
 - GitHub - [@taranchik](https://github.com/taranchik)
