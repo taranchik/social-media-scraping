@@ -76,4 +76,4 @@ docker-compose up -d
 - GitLab - [@taranchik](https://gitlab.com/taranchik)
 - Twitter - [@viataranushenko](https://twitter.com/viataranushenko)
 
-[Back To The Top](#web-scrping)
+[Back To The Top](#web-scraping)
