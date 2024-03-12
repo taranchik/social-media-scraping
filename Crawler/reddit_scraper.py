@@ -1,4 +1,3 @@
-from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
@@ -169,5 +168,5 @@ class RedditScraper(Browser):
     # Example of Reddit filters (avaliable by rating and number_of_comments)
     # reddit.retreive_subreddit_posts('investing', {"number_of_comments": {"min": 100}})
     self.retreive_subreddit_posts('investing')
-    self.retreive_subreddit_posts('layer_two')
+    self.retreive_subreddit_posts('blockchain')
     self.close()

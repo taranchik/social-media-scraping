@@ -34,12 +34,12 @@ def run_tasks():
     try:
         reddit.run_scraper()
     except Exception as e:
-        print(f"While Reddit scrapping an error occurred: {str(e)}.")
+        print(f"While Reddit scraping an error occurred: {str(e)}.")
 
     try:
         twitter.run_scraper(env['TWITTER_USERNAME'], env['TWITTER_PASSWORD'])
     except Exception as e:
-        print(f"While Twitter scrapping an error occurred: {str(e)}.")
+        print(f"While Twitter scraping an error occurred: {str(e)}.")
 
 if __name__ == "__main__":
     schedule.every().hour.do(run_tasks)
