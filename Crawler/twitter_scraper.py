@@ -76,7 +76,7 @@ class TwitterScraper(Browser):
             else:
               attempts_to_load += 1
   
-  def signIn(self, username, password):
+  def signIn(self, email, username, password):
     # Open Twitter
     self._driver.get("https://twitter.com/login")
 
@@ -105,6 +105,20 @@ class TwitterScraper(Browser):
         log_in_button.click()
     except TimeoutException:
         raise Exception("Time out waiting for password form to load.")
+    
+    # Handle optional account email form
+    try:
+        email_input = WebDriverWait(self._driver, self.load_timeout).until(
+            EC.presence_of_element_located((By.XPATH, '//input[@autocomplete="email"]'))
+        )
+        email_input.send_keys(email)
+
+        next_button = WebDriverWait(self._driver, self.load_timeout).until(
+            EC.presence_of_element_located((By.XPATH, '//span[text()="Next"]'))
+        )
+        next_button.click()
+    except TimeoutException:
+        pass
     
     try:
       WebDriverWait(self._driver, self.load_timeout).until(
@@ -182,9 +196,9 @@ class TwitterScraper(Browser):
    
     self.hashtag_collection.update_one({"hashtag": hashtag}, {"$set": {"updated_at": datetime.utcnow(), "tweet_ids": tweet_ids}}, upsert=True)
 
-  def run_scraper(self, username, password):
+  def run_scraper(self, email, username, password):
     self.open()
-    self.signIn(username, password)
+    self.signIn(email, username, password)
     self.retreive_lastest_profile_tweets('donaldtusk')
     self.retreive_popular_tweets('holiday')
     self.close()

@@ -37,7 +37,7 @@ def run_tasks():
         print(f"While Reddit scraping an error occurred: {str(e)}.")
 
     try:
-        twitter.run_scraper(env['TWITTER_USERNAME'], env['TWITTER_PASSWORD'])
+        twitter.run_scraper(env['TWITTER_EMAIL'], env['TWITTER_USERNAME'], env['TWITTER_PASSWORD'])
     except Exception as e:
         print(f"While Twitter scraping an error occurred: {str(e)}.")
 
