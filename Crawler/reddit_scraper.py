@@ -3,10 +3,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
 from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
-from Crawler.browser import Browser
+from Crawler.scraper import Scraper
 
 
-class RedditScraper(Browser):
+class RedditScraper(Scraper):
   def __init__(self, posts_collection, subreddit_posts_collection):
     super().__init__()
     

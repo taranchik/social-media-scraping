@@ -3,7 +3,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-class Browser():
+class Scraper():
   def __init__(self):
     self.options = Options()
     self.options.add_argument('--no-sandbox')

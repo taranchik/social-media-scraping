@@ -3,10 +3,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
 from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
-from Crawler.browser import Browser
+from Crawler.scraper import Scraper
 
 
-class TwitterScraper(Browser):
+class TwitterScraper(Scraper):
   def __init__(self, tweets_collection, profile_collection, hashtag_collection):
     super().__init__()
     
